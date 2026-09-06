@@ -1,0 +1,37 @@
+{
+  "id": "cetemflow-restaurant-app",
+  "name": "CETEM Flow — Restaurant Operations",
+  "short_name": "CETEM Flow",
+  "description": "Restoran ve Kafe Operasyon Yönetim Sistemi, Vardiya, Görev Takibi ve Denetim",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07090D",
+  "theme_color": "#07090D",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "food"],
+  "shortcuts": [
+    {
+      "name": "Görevlerim",
+      "short_name": "Görevler",
+      "description": "Günlük atanmış restoran görevlerini gör",
+      "url": "/?tab=tasks",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Arıza Bildir",
+      "short_name": "Arıza",
+      "description": "Hızlı arıza veya acil durum bildirimi",
+      "url": "/?action=report_issue",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "CETEM Flow",
+  "description": "Restaurant Operations — Kafe & Restoran Operasyon Yönetim Uygulaması",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+

@@ -1,0 +1,9 @@
+{
+  "appId": "com.cetem.flow",
+  "appName": "CETEM Flow",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

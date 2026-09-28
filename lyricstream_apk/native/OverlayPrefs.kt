@@ -42,7 +42,7 @@ class OverlayPrefs(context: Context) {
         set(v) = p.edit().putInt("overlayX", v).apply()
 
     var overlayY: Int
-        get() = p.getInt("overlayY", 110)
+        get() = p.getInt("overlayY", -1)
         set(v) = p.edit().putInt("overlayY", v).apply()
 
     fun applyFrom(args: Map<String, Any?>) {

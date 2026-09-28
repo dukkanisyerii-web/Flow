@@ -119,8 +119,8 @@ class OverlayService : Service() {
     private fun attachWindows() {
         val metrics = resources.displayMetrics
         val screenW = metrics.widthPixels
-        val overlayW = (screenW * .92f).roundToInt()
-        val overlayH = dp(214)
+        val overlayW = (screenW * .96f).roundToInt()
+        val overlayH = dp(220)
         val defaultX = ((screenW - overlayW) / 2).coerceAtLeast(0)
 
         val defaultY = dp(84)
@@ -138,7 +138,7 @@ class OverlayService : Service() {
             gravity = Gravity.TOP or Gravity.START
             x = if (prefs.overlayX == 0) defaultX else prefs.overlayX
             y = if (prefs.overlayY < safeTop) defaultY else prefs.overlayY
-            alpha = .79f
+            alpha = prefs.opacity
         }
 
         lyricView.setOnTouchListener { _, event ->
@@ -206,8 +206,9 @@ class OverlayService : Service() {
     private fun setEditMode(enabled: Boolean) {
         editMode = enabled
         lyricParams.flags = if (enabled) editFlags() else lockedFlags()
-        lyricParams.alpha = if (enabled) 1f else .79f
+        lyricParams.alpha = prefs.opacity
         lyricView.setEditMode(enabled)
+        orbView.active = enabled
         safeUpdate(lyricView, lyricParams)
         if (enabled) scheduleAutoLock() else handler.removeCallbacks(autoLock)
     }
@@ -229,10 +230,13 @@ class OverlayService : Service() {
     private fun applyVisualSettings() {
         if (::lyricView.isInitialized) {
             lyricView.reloadSettings()
-            lyricParams.alpha = if (editMode) 1f else .79f
+            lyricParams.alpha = prefs.opacity
             safeUpdate(lyricView, lyricParams)
         }
-        if (::orbView.isInitialized) orbView.accent = accentForTheme()
+        if (::orbView.isInitialized) {
+            orbView.accent = accentForTheme()
+            orbView.active = editMode
+        }
     }
 
     private fun accentForTheme(): Int = when (prefs.theme) {

@@ -660,7 +660,7 @@ class _PermissionTile extends StatelessWidget {
       ])),
       const Icon(Icons.chevron_right_rounded, color: Color(0xFF747889)),
     ]),
-  )));
+  ));
 }
 
 class _SliderRow extends StatelessWidget {

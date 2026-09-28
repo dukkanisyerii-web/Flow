@@ -442,13 +442,13 @@ class SyncLab extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _Nudge(label: '-0.50', onTap: () => model.setSync((model.syncMs - 500).clamp(-2500, 2500))),
+                _Nudge(label: '-0.50', onTap: () => model.setSync((model.syncMs - 500).clamp(-2500, 2500).toDouble())),
                 const SizedBox(width: 8),
-                _Nudge(label: '-0.10', onTap: () => model.setSync((model.syncMs - 100).clamp(-2500, 2500))),
+                _Nudge(label: '-0.10', onTap: () => model.setSync((model.syncMs - 100).clamp(-2500, 2500).toDouble())),
                 const SizedBox(width: 8),
-                _Nudge(label: '+0.10', onTap: () => model.setSync((model.syncMs + 100).clamp(-2500, 2500))),
+                _Nudge(label: '+0.10', onTap: () => model.setSync((model.syncMs + 100).clamp(-2500, 2500).toDouble())),
                 const SizedBox(width: 8),
-                _Nudge(label: '+0.50', onTap: () => model.setSync((model.syncMs + 500).clamp(-2500, 2500))),
+                _Nudge(label: '+0.50', onTap: () => model.setSync((model.syncMs + 500).clamp(-2500, 2500).toDouble())),
               ],
             ),
           ],
@@ -457,7 +457,7 @@ class SyncLab extends StatelessWidget {
         const _Glass(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Nasıl çalışıyor?', style: TextStyle(fontWeight: FontWeight.w650)),
+            Text('Nasıl çalışıyor?', style: TextStyle(fontWeight: FontWeight.w600)),
             SizedBox(height: 7),
             Text('MediaSession playback konumuna global offset uygulanır. Şarkı değiştiğinde LRC yeniden hizalanır; seek/pause/resume konumu otomatik takip edilir.',
               style: TextStyle(height: 1.45, color: Color(0xFFADB0BE), fontSize: 13)),
@@ -590,7 +590,7 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title, this.subtitle);
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(title, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w720, letterSpacing: -.6)),
+    Text(title, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w700, letterSpacing: -.6)),
     const SizedBox(height: 3),
     Text(subtitle, style: const TextStyle(fontSize: 12.5, color: Color(0xFF8E92A6))),
   ]);
@@ -637,7 +637,7 @@ class _MiniCard extends StatelessWidget {
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(title, style: const TextStyle(fontSize: 10, color: Color(0xFF8E92A6))),
       const SizedBox(height: 2),
-      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w650)),
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
     ])),
   ]));
 }
@@ -654,7 +654,7 @@ class _PermissionTile extends StatelessWidget {
         child: Icon(icon, size: 20, color: const Color(0xFFD498FF))),
       const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w650)),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 3),
         Text(subtitle, style: const TextStyle(fontSize: 11.5, color: Color(0xFF8E92A6), height: 1.3)),
       ])),
@@ -671,7 +671,7 @@ class _SliderRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(children: [
       SizedBox(width: 92, child: Text(label, style: const TextStyle(fontSize: 12.5, color: Color(0xFFB5B8C6)))),
-      Expanded(child: Slider(min: min, max: max, value: value.clamp(min, max), onChanged: onChanged)),
+      Expanded(child: Slider(min: min, max: max, value: value.clamp(min, max).toDouble(), onChanged: onChanged)),
       SizedBox(width: 38, child: Text(value.toStringAsFixed(2), textAlign: TextAlign.right, style: const TextStyle(fontSize: 10, color: Color(0xFF818597)))),
     ]),
   );
@@ -796,7 +796,7 @@ class LyricPreviewPainter extends CustomPainter {
     _text(c, s, 'Böyle günler olur', s.height * .35, 12 * fontScale, Colors.white.withOpacity(.28), FontWeight.w500);
     final activeSize = 28 * fontScale;
     final tp = TextPainter(
-      text: TextSpan(text: 'Böyle günler olur', style: TextStyle(fontSize: activeSize, fontWeight: FontWeight.w760,
+      text: TextSpan(text: 'Böyle günler olur', style: TextStyle(fontSize: activeSize, fontWeight: FontWeight.w700,
         foreground: Paint()..shader = LinearGradient(colors: colors).createShader(Rect.fromLTWH(0,0,s.width,50)),
         shadows: [Shadow(color: colors[1].withOpacity(.65 * strength), blurRadius: 18 * strength)])),
       textDirection: TextDirection.ltr, maxLines: 2, textAlign: TextAlign.center,

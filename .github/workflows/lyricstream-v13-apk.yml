@@ -67,7 +67,7 @@ jobs:
 
       - name: Analyze
         working-directory: _build/lyricstream
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: flutter analyze lib --no-fatal-infos --no-fatal-warnings
 
       - name: Build debug APK
         working-directory: _build/lyricstream

@@ -10,6 +10,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.media.session.MediaController
@@ -23,6 +24,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import java.net.HttpURLConnection
@@ -36,6 +38,8 @@ import kotlin.math.roundToInt
 class OverlayService : Service() {
     companion object {
         const val ACTION_SETTINGS_CHANGED = "com.example.lyricstream.SETTINGS_CHANGED"
+        const val ACTION_APP_VISIBILITY = "com.example.lyricstream.APP_VISIBILITY"
+        const val EXTRA_APP_VISIBLE = "visible"
         const val ACTION_STOP = "com.example.lyricstream.STOP"
         private const val CHANNEL_ID = "lyricstream_overlay"
         private const val NOTIFICATION_ID = 713
@@ -57,6 +61,8 @@ class OverlayService : Service() {
     private val handler = Handler(Looper.getMainLooper())
 
     private var editMode = false
+    private var appVisible = false
+    private var landscapeMode = false
     private var dragDownRawX = 0f
     private var dragDownRawY = 0f
     private var dragStartX = 0
@@ -73,7 +79,13 @@ class OverlayService : Service() {
 
     private val settingsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == ACTION_SETTINGS_CHANGED) applyVisualSettings()
+            when (intent?.action) {
+                ACTION_SETTINGS_CHANGED -> applyVisualSettings()
+                ACTION_APP_VISIBILITY -> {
+                    appVisible = intent.getBooleanExtra(EXTRA_APP_VISIBLE, false)
+                    setOverlayVisibility(!appVisible)
+                }
+            }
         }
     }
 
@@ -94,9 +106,19 @@ class OverlayService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
 
-        val filter = IntentFilter(ACTION_SETTINGS_CHANGED)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(settingsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        else @Suppress("DEPRECATION") registerReceiver(settingsReceiver, filter)
+        appVisible = MainActivity.isForeground
+        landscapeMode = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        val filter = IntentFilter().apply {
+            addAction(ACTION_SETTINGS_CHANGED)
+            addAction(ACTION_APP_VISIBILITY)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(settingsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(settingsReceiver, filter)
+        }
 
         if (Settings.canDrawOverlays(this)) {
             attachWindows()
@@ -117,32 +139,42 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun attachWindows() {
-        val metrics = resources.displayMetrics
-        val screenW = metrics.widthPixels
-        val overlayW = (screenW * .96f).roundToInt()
-        val overlayH = dp(220)
-        val defaultX = ((screenW - overlayW) / 2).coerceAtLeast(0)
-
-        val defaultY = dp(84)
-        val safeTop = dp(54)
-
         lyricView = LyricOverlayView(this)
+        orbView = UnlockOrbView(this) { setEditMode(!editMode) }
+        orbView.accent = accentForTheme()
+
+        val type = if (Build.VERSION.SDK_INT >= 26) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
         lyricParams = WindowManager.LayoutParams(
-            overlayW,
-            overlayH,
-            if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
+            1,
+            1,
+            type,
             lockedFlags(),
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = if (prefs.overlayX == 0) defaultX else prefs.overlayX
-            y = if (prefs.overlayY < safeTop) defaultY else prefs.overlayY
             alpha = prefs.opacity
+        }
+
+        orbParams = WindowManager.LayoutParams(
+            dp(30),
+            dp(30),
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
         }
 
         lyricView.setOnTouchListener { _, event ->
             if (!editMode) return@setOnTouchListener false
+
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     dragDownRawX = event.rawX
@@ -152,44 +184,121 @@ class OverlayService : Service() {
                     scheduleAutoLock()
                     true
                 }
+
                 MotionEvent.ACTION_MOVE -> {
+                    val metrics = resources.displayMetrics
+                    val safeTop = currentSafeTop()
                     val dx = (event.rawX - dragDownRawX).roundToInt()
                     val dy = (event.rawY - dragDownRawY).roundToInt()
-                    lyricParams.x = (dragStartX + dx).coerceIn(0, (metrics.widthPixels - lyricParams.width).coerceAtLeast(0))
-                    lyricParams.y = (dragStartY + dy).coerceIn(safeTop, (metrics.heightPixels - lyricParams.height).coerceAtLeast(safeTop))
+
+                    lyricParams.x = (dragStartX + dx).coerceIn(
+                        0,
+                        (metrics.widthPixels - lyricParams.width).coerceAtLeast(0)
+                    )
+                    lyricParams.y = (dragStartY + dy).coerceIn(
+                        safeTop,
+                        (metrics.heightPixels - lyricParams.height).coerceAtLeast(safeTop)
+                    )
+
                     safeUpdate(lyricView, lyricParams)
                     updateOrbPosition()
                     scheduleAutoLock()
                     true
                 }
+
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    prefs.overlayX = lyricParams.x
-                    prefs.overlayY = lyricParams.y
+                    prefs.savePosition(
+                        landscape = landscapeMode,
+                        x = lyricParams.x,
+                        y = lyricParams.y
+                    )
                     scheduleAutoLock()
                     true
                 }
+
                 else -> false
             }
         }
 
-        orbView = UnlockOrbView(this) { setEditMode(!editMode) }
-        orbView.accent = accentForTheme()
-        orbParams = WindowManager.LayoutParams(
-            dp(30),
-            dp(30),
-            if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-        }
-
+        applyOrientationGeometry(loadSavedPosition = true)
         wm.addView(lyricView, lyricParams)
         updateOrbPosition()
         wm.addView(orbView, orbParams)
+
         applyVisualSettings()
+        setOverlayVisibility(!appVisible)
+    }
+
+    private fun currentSafeTop(): Int = if (landscapeMode) dp(28) else dp(54)
+
+    private fun defaultY(): Int = if (landscapeMode) dp(46) else dp(84)
+
+    private fun applyOrientationGeometry(loadSavedPosition: Boolean) {
+        val metrics = resources.displayMetrics
+        val screenW = metrics.widthPixels
+
+        lyricParams.width = (
+            screenW * if (landscapeMode) .78f else .96f
+        ).roundToInt()
+        lyricParams.height = if (landscapeMode) dp(154) else dp(220)
+
+        val defaultX = ((screenW - lyricParams.width) / 2).coerceAtLeast(0)
+        val safeTop = currentSafeTop()
+
+        if (loadSavedPosition) {
+            val savedY = prefs.positionY(landscapeMode)
+            val savedX = prefs.positionX(landscapeMode)
+
+            lyricParams.x = if (savedY < safeTop) {
+                defaultX
+            } else {
+                savedX.coerceIn(
+                    0,
+                    (screenW - lyricParams.width).coerceAtLeast(0)
+                )
+            }
+
+            lyricParams.y = if (savedY < safeTop) {
+                defaultY()
+            } else {
+                savedY.coerceIn(
+                    safeTop,
+                    (metrics.heightPixels - lyricParams.height).coerceAtLeast(safeTop)
+                )
+            }
+        } else {
+            lyricParams.x = lyricParams.x.coerceIn(
+                0,
+                (screenW - lyricParams.width).coerceAtLeast(0)
+            )
+            lyricParams.y = lyricParams.y.coerceIn(
+                safeTop,
+                (metrics.heightPixels - lyricParams.height).coerceAtLeast(safeTop)
+            )
+        }
+
+        if (::lyricView.isInitialized && lyricView.isAttachedToWindow) {
+            safeUpdate(lyricView, lyricParams)
+            updateOrbPosition()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        if (::lyricParams.isInitialized) {
+            prefs.savePosition(
+                landscape = landscapeMode,
+                x = lyricParams.x,
+                y = lyricParams.y
+            )
+        }
+
+        super.onConfigurationChanged(newConfig)
+
+        landscapeMode = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        if (::lyricParams.isInitialized) {
+            applyOrientationGeometry(loadSavedPosition = true)
+        }
     }
 
     private fun lockedFlags(): Int =
@@ -220,11 +329,34 @@ class OverlayService : Service() {
 
     private fun updateOrbPosition() {
         if (!::orbParams.isInitialized) return
-        val left = lyricParams.x
-        val desired = left - dp(15)
-        orbParams.x = desired.coerceAtLeast(2)
+
+        // Keep the visible orb near the lyric field, not at the invisible
+        // system-window edge.
+        orbParams.x = (
+            lyricParams.x + lyricParams.width * .095f
+        ).roundToInt() - dp(15)
         orbParams.y = lyricParams.y + lyricParams.height / 2 - dp(15)
-        if (::orbView.isInitialized && orbView.isAttachedToWindow) safeUpdate(orbView, orbParams)
+
+        if (::orbView.isInitialized && orbView.isAttachedToWindow) {
+            safeUpdate(orbView, orbParams)
+        }
+    }
+
+    private fun setOverlayVisibility(visible: Boolean) {
+        if (!::lyricView.isInitialized || !::orbView.isInitialized) return
+
+        if (!visible && editMode) {
+            editMode = false
+            lyricParams.flags = lockedFlags()
+            lyricView.setEditMode(false)
+            orbView.active = false
+            safeUpdate(lyricView, lyricParams)
+            handler.removeCallbacks(autoLock)
+        }
+
+        val state = if (visible) View.VISIBLE else View.INVISIBLE
+        lyricView.visibility = state
+        orbView.visibility = state
     }
 
     private fun applyVisualSettings() {
@@ -369,7 +501,7 @@ class OverlayService : Service() {
             connectTimeout = 6500
             readTimeout = 6500
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "LyricStream/13 Android")
+            setRequestProperty("User-Agent", "LyricStream/16 Android")
             setRequestProperty("Accept", "application/json")
         }
         return try {

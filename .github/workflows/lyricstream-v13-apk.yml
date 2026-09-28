@@ -1,9 +1,9 @@
-name: LyricStream V14 APK
+name: LyricStream V15 APK
 
 on:
   push:
     branches:
-      - lyricstream-v14-overlay-polish
+      - lyricstream-v15-pure-aura
     paths:
       - "lyricstream_apk/**"
       - ".github/workflows/lyricstream-v13-apk.yml"
@@ -37,7 +37,7 @@ jobs:
           rm -rf _build/lyricstream
           flutter create --platforms=android --org com.example --project-name lyricstream _build/lyricstream
 
-      - name: Inject LyricStream V13 sources
+      - name: Inject LyricStream V15 sources
         run: |
           cp lyricstream_apk/pubspec.yaml _build/lyricstream/pubspec.yaml
           cp lyricstream_apk/lib/main.dart _build/lyricstream/lib/main.dart
@@ -61,9 +61,13 @@ jobs:
         working-directory: _build/lyricstream
         run: flutter pub get
 
-      - name: Format check
+      - name: Format generated app
         working-directory: _build/lyricstream
-        run: dart format --output=none --set-exit-if-changed lib/main.dart || true
+        run: dart format lib/main.dart
+
+      - name: Analyze
+        working-directory: _build/lyricstream
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build debug APK
         working-directory: _build/lyricstream
@@ -71,15 +75,15 @@ jobs:
 
       - name: Rename APK
         run: |
-          cp _build/lyricstream/build/app/outputs/flutter-apk/app-debug.apk LyricStream-v14-Luminous-debug.apk
-          sha256sum LyricStream-v14-Luminous-debug.apk > LyricStream-v14-Luminous-debug.sha256
+          cp _build/lyricstream/build/app/outputs/flutter-apk/app-debug.apk LyricStream-v15-Pure-Aura-debug.apk
+          sha256sum LyricStream-v15-Pure-Aura-debug.apk > LyricStream-v15-Pure-Aura-debug.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LyricStream-v14-Luminous-debug
+          name: LyricStream-v15-Pure-Aura-debug
           path: |
-            LyricStream-v14-Luminous-debug.apk
-            LyricStream-v14-Luminous-debug.sha256
+            LyricStream-v15-Pure-Aura-debug.apk
+            LyricStream-v15-Pure-Aura-debug.sha256
           if-no-files-found: error
           retention-days: 14

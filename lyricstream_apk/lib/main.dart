@@ -209,7 +209,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('LyricStream', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.4)),
-              Text('PURE AURA 15', style: TextStyle(fontSize: 9, letterSpacing: 1.8, color: Color(0xFF8E92A6))),
+              Text('ADAPTIVE AURA 16', style: TextStyle(fontSize: 9, letterSpacing: 1.8, color: Color(0xFF8E92A6))),
             ],
           ),
           const Spacer(),
@@ -288,16 +288,15 @@ class Dashboard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        Row(children: [
-          Expanded(child: _ActionButton(
-            label: model.overlayRunning ? 'Overlay aktif' : 'Overlay’i başlat',
-            icon: model.overlayRunning ? Icons.bolt_rounded : Icons.play_arrow_rounded,
+        if (model.overlayRunning)
+          _RunningOverlayControl(onStop: model.stop)
+        else
+          _ActionButton(
+            label: 'Overlay’i başlat',
+            icon: Icons.play_arrow_rounded,
             primary: true,
-            onTap: model.overlayRunning ? null : model.start,
-          )),
-          const SizedBox(width: 10),
-          _SquareButton(icon: Icons.stop_rounded, onTap: model.overlayRunning ? model.stop : null),
-        ]),
+            onTap: model.start,
+          ),
         const SizedBox(height: 14),
         Row(children: [
           Expanded(child: _MiniCard(
@@ -361,7 +360,23 @@ class Studio extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
+        const _Glass(
+          padding: EdgeInsets.fromLTRB(14, 11, 14, 11),
+          child: Row(
+            children: [
+              Icon(Icons.screen_rotation_alt_rounded, size: 17, color: Color(0xFF8FDFFF)),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'Dikey ve yatay HUD konumları ayrı kaydedilir.',
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFFADB0BE)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         _Glass(child: Column(children: [
           _SliderRow('Aura gücü', model.strength, 0.15, 1.0, model.setStrength),
           _SliderRow('Işık yayılımı', model.spread, 0.2, 1.0, model.setSpread),
@@ -609,6 +624,72 @@ class _SectionTitle extends StatelessWidget {
     const SizedBox(height: 3),
     Text(subtitle, style: const TextStyle(fontSize: 12.5, color: Color(0xFF8E92A6))),
   ]);
+}
+
+class _RunningOverlayControl extends StatelessWidget {
+  final VoidCallback onStop;
+  const _RunningOverlayControl({required this.onStop});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Glass(
+      radius: 20,
+      padding: const EdgeInsets.fromLTRB(15, 10, 10, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF61E8FF),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0xAA61E8FF),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Overlay açık',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'Uygulamadan çıkınca HUD otomatik görünür.',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF8E92A6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onStop,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFCDD0DC),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            icon: const Icon(Icons.stop_rounded, size: 16),
+            label: const Text(
+              'Durdur',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ActionButton extends StatelessWidget {

@@ -120,8 +120,11 @@ class OverlayService : Service() {
         val metrics = resources.displayMetrics
         val screenW = metrics.widthPixels
         val overlayW = (screenW * .92f).roundToInt()
-        val overlayH = dp(190)
+        val overlayH = dp(214)
         val defaultX = ((screenW - overlayW) / 2).coerceAtLeast(0)
+
+        val defaultY = dp(84)
+        val safeTop = dp(54)
 
         lyricView = LyricOverlayView(this)
         lyricParams = WindowManager.LayoutParams(
@@ -134,7 +137,7 @@ class OverlayService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = if (prefs.overlayX == 0) defaultX else prefs.overlayX
-            y = prefs.overlayY
+            y = if (prefs.overlayY < safeTop) defaultY else prefs.overlayY
             alpha = .79f
         }
 
@@ -153,7 +156,7 @@ class OverlayService : Service() {
                     val dx = (event.rawX - dragDownRawX).roundToInt()
                     val dy = (event.rawY - dragDownRawY).roundToInt()
                     lyricParams.x = (dragStartX + dx).coerceIn(0, (metrics.widthPixels - lyricParams.width).coerceAtLeast(0))
-                    lyricParams.y = (dragStartY + dy).coerceIn(0, (metrics.heightPixels - lyricParams.height).coerceAtLeast(0))
+                    lyricParams.y = (dragStartY + dy).coerceIn(safeTop, (metrics.heightPixels - lyricParams.height).coerceAtLeast(safeTop))
                     safeUpdate(lyricView, lyricParams)
                     updateOrbPosition()
                     scheduleAutoLock()
@@ -172,8 +175,8 @@ class OverlayService : Service() {
         orbView = UnlockOrbView(this) { setEditMode(!editMode) }
         orbView.accent = accentForTheme()
         orbParams = WindowManager.LayoutParams(
-            dp(32),
-            dp(32),
+            dp(30),
+            dp(30),
             if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -217,9 +220,9 @@ class OverlayService : Service() {
     private fun updateOrbPosition() {
         if (!::orbParams.isInitialized) return
         val left = lyricParams.x
-        val desired = left - dp(18)
+        val desired = left - dp(15)
         orbParams.x = desired.coerceAtLeast(2)
-        orbParams.y = lyricParams.y + lyricParams.height / 2 - dp(16)
+        orbParams.y = lyricParams.y + lyricParams.height / 2 - dp(15)
         if (::orbView.isInitialized && orbView.isAttachedToWindow) safeUpdate(orbView, orbParams)
     }
 

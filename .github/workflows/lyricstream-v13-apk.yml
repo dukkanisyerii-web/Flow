@@ -1,0 +1,85 @@
+name: LyricStream V13 APK
+
+on:
+  push:
+    branches:
+      - lyricstream-v13-apk-build
+    paths:
+      - "lyricstream_apk/**"
+      - ".github/workflows/lyricstream-v13-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create clean Flutter shell
+        run: |
+          rm -rf _build/lyricstream
+          flutter create --platforms=android --org com.example --project-name lyricstream _build/lyricstream
+
+      - name: Inject LyricStream V13 sources
+        run: |
+          cp lyricstream_apk/pubspec.yaml _build/lyricstream/pubspec.yaml
+          cp lyricstream_apk/lib/main.dart _build/lyricstream/lib/main.dart
+
+          PKG="_build/lyricstream/android/app/src/main/kotlin/com/example/lyricstream"
+          mkdir -p "$PKG"
+          rm -f "$PKG"/*.kt
+          cp lyricstream_apk/native/*.kt "$PKG"/
+
+          cp lyricstream_apk/native/AndroidManifest.xml _build/lyricstream/android/app/src/main/AndroidManifest.xml
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("_build/lyricstream/android/app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace("minSdk = flutter.minSdkVersion", "minSdk = 26")
+          p.write_text(s)
+          PY
+
+      - name: Dependencies
+        working-directory: _build/lyricstream
+        run: flutter pub get
+
+      - name: Format check
+        working-directory: _build/lyricstream
+        run: dart format --output=none --set-exit-if-changed lib/main.dart || true
+
+      - name: Build debug APK
+        working-directory: _build/lyricstream
+        run: flutter build apk --debug
+
+      - name: Rename APK
+        run: |
+          cp _build/lyricstream/build/app/outputs/flutter-apk/app-debug.apk LyricStream-v13-Luminous-debug.apk
+          sha256sum LyricStream-v13-Luminous-debug.apk > LyricStream-v13-Luminous-debug.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LyricStream-v13-Luminous-debug
+          path: |
+            LyricStream-v13-Luminous-debug.apk
+            LyricStream-v13-Luminous-debug.sha256
+          if-no-files-found: error
+          retention-days: 14

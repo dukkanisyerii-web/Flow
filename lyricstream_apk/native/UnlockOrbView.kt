@@ -18,7 +18,8 @@ class UnlockOrbView(
     private var downX = 0f
     private var downY = 0f
     private var moved = false
-    var accent = Color.rgb(201, 103, 255)
+
+    var accent = Color.rgb(199, 106, 255)
         set(value) { field = value; invalidate() }
 
     init {
@@ -30,17 +31,25 @@ class UnlockOrbView(
         super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        val glow = width * .34f
+
+        // 30dp touch target, only ~7dp visually visible.
+        val halo = width * .25f
         paint.shader = RadialGradient(
-            cx, cy, glow,
-            intArrayOf(Color.WHITE, accent, Color.argb(0, Color.red(accent), Color.green(accent), Color.blue(accent))),
-            floatArrayOf(0f, .23f, 1f),
+            cx, cy, halo,
+            intArrayOf(
+                Color.WHITE,
+                accent,
+                Color.argb(72, Color.red(accent), Color.green(accent), Color.blue(accent)),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, .18f, .46f, 1f),
             Shader.TileMode.CLAMP
         )
-        canvas.drawCircle(cx, cy, glow, paint)
+        canvas.drawCircle(cx, cy, halo, paint)
+
         paint.shader = null
         paint.color = Color.WHITE
-        canvas.drawCircle(cx, cy, width * .047f, paint)
+        canvas.drawCircle(cx, cy, width * .035f, paint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

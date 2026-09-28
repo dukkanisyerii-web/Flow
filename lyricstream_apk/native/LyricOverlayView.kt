@@ -22,7 +22,6 @@ class LyricOverlayView(context: Context) : View(context) {
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val dimPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
-    private val editPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private var prefs = OverlayPrefs(context)
     private var lines: List<LyricLine> = emptyList()
@@ -33,7 +32,6 @@ class LyricOverlayView(context: Context) : View(context) {
     private var currentIndex = -1
     private var previousIndex = -1
     private var transitionStarted = 0L
-    private var editMode = false
 
     private val density get() = resources.displayMetrics.density
     private val scaledDensity get() = resources.displayMetrics.scaledDensity
@@ -44,6 +42,7 @@ class LyricOverlayView(context: Context) : View(context) {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
         isFocusable = false
         isClickable = false
+        setBackgroundColor(Color.TRANSPARENT)
     }
 
     fun reloadSettings() {
@@ -53,7 +52,8 @@ class LyricOverlayView(context: Context) : View(context) {
     }
 
     fun setEditMode(enabled: Boolean) {
-        editMode = enabled
+        // Pure Aura mode is intentionally frame-free.
+        // Edit mode changes input handling in OverlayService only.
         invalidate()
     }
 
@@ -97,11 +97,11 @@ class LyricOverlayView(context: Context) : View(context) {
     }
 
     private fun palette(): IntArray = when (prefs.theme) {
-        "prism" -> intArrayOf(Color.rgb(105, 167, 255), Color.rgb(233, 110, 255), Color.rgb(255, 200, 97))
-        "ember" -> intArrayOf(Color.rgb(255, 166, 78), Color.rgb(255, 82, 106), Color.rgb(209, 62, 255))
-        "mint" -> intArrayOf(Color.rgb(93, 255, 208), Color.rgb(93, 199, 255), Color.rgb(165, 120, 255))
-        "mono" -> intArrayOf(Color.WHITE, Color.rgb(221, 226, 240), Color.rgb(140, 149, 170))
-        else -> intArrayOf(Color.rgb(85, 230, 255), Color.rgb(199, 106, 255), Color.rgb(255, 101, 165))
+        "prism" -> intArrayOf(Color.rgb(104, 171, 255), Color.rgb(232, 111, 255), Color.rgb(255, 198, 95))
+        "ember" -> intArrayOf(Color.rgb(255, 171, 82), Color.rgb(255, 84, 111), Color.rgb(210, 68, 255))
+        "mint" -> intArrayOf(Color.rgb(91, 255, 211), Color.rgb(92, 201, 255), Color.rgb(163, 122, 255))
+        "mono" -> intArrayOf(Color.WHITE, Color.rgb(222, 227, 239), Color.rgb(150, 157, 176))
+        else -> intArrayOf(Color.rgb(87, 230, 255), Color.rgb(200, 107, 255), Color.rgb(255, 103, 169))
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -109,67 +109,75 @@ class LyricOverlayView(context: Context) : View(context) {
         if (width <= 0 || height <= 0) return
 
         val colors = palette()
-        val cx = width * .52f
-        val cy = height * .52f
+        val cx = width * .50f
+        val cy = height * .51f
         val strength = prefs.strength.coerceIn(.1f, 1f)
         val spread = prefs.spread.coerceIn(.15f, 1f)
-        val radius = width * (.25f + spread * .29f)
 
-        drawAura(canvas, cx, cy, radius, colors, strength)
-        drawParticles(canvas, cx, cy, radius, colors, strength)
+        drawLocalLight(canvas, cx, cy, colors, strength, spread)
+        drawParticles(canvas, cx, cy, colors, strength, spread)
 
-        if (lines.isEmpty() || currentIndex < 0) drawIdle(canvas, colors, cy)
-        else drawLyrics(canvas, colors, cy)
-
-        if (editMode) drawEditCorners(canvas, colors[1])
+        if (lines.isEmpty() || currentIndex < 0) {
+            drawIdle(canvas, colors, cy)
+        } else {
+            drawLyrics(canvas, colors, cy)
+        }
     }
 
-    private fun drawAura(
+    private fun drawLocalLight(
         canvas: Canvas,
         cx: Float,
         cy: Float,
-        radius: Float,
         colors: IntArray,
-        strength: Float
+        strength: Float,
+        spread: Float
     ) {
         fun argb(alpha: Int, color: Int) = Color.argb(
             alpha.coerceIn(0, 255),
             Color.red(color), Color.green(color), Color.blue(color)
         )
 
-        // Wide, soft and deliberately non-rectangular light field.
-        canvas.save()
-        canvas.translate(cx, cy)
-        canvas.scale(1f, .52f)
-        auraPaint.shader = RadialGradient(
-            0f, 0f, radius,
-            intArrayOf(
-                argb((94 * strength).toInt(), colors[1]),
-                argb((54 * strength).toInt(), colors[2]),
-                argb((27 * strength).toInt(), colors[0]),
-                Color.TRANSPARENT
-            ),
-            floatArrayOf(0f, .28f, .62f, 1f),
-            Shader.TileMode.CLAMP
-        )
-        canvas.drawCircle(0f, 0f, radius, auraPaint)
-        canvas.restore()
+        val base = min(width * .22f, dp(96f)) * (.78f + spread * .38f)
 
-        // Offset cyan/pink lobes keep it from looking like one generic glow.
-        val lobeRadius = radius * .62f
-        auraPaint.shader = RadialGradient(
-            cx - radius * .22f, cy + dp(4f), lobeRadius,
-            intArrayOf(argb((42 * strength).toInt(), colors[0]), Color.TRANSPARENT),
-            floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
+        // Three small feathered light clouds. None reaches the overlay bounds,
+        // so there is no visible panel, edge, rectangle, or clipped light wall.
+        val lobes = arrayOf(
+            Triple(cx - base * .34f, cy + dp(1f), colors[0]),
+            Triple(cx + base * .05f, cy - dp(2f), colors[1]),
+            Triple(cx + base * .34f, cy + dp(3f), colors[2]),
         )
-        canvas.drawCircle(cx - radius * .22f, cy + dp(4f), lobeRadius, auraPaint)
 
-        auraPaint.shader = RadialGradient(
-            cx + radius * .25f, cy - dp(2f), lobeRadius * .92f,
-            intArrayOf(argb((38 * strength).toInt(), colors[2]), Color.TRANSPARENT),
-            floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
-        )
-        canvas.drawCircle(cx + radius * .25f, cy - dp(2f), lobeRadius * .92f, auraPaint)
+        for ((index, lobe) in lobes.withIndex()) {
+            val lx = lobe.first
+            val ly = lobe.second
+            val color = lobe.third
+            val radius = base * when (index) {
+                0 -> .90f
+                1 -> 1.08f
+                else -> .88f
+            }
+
+            canvas.save()
+            canvas.translate(lx, ly)
+            canvas.scale(1f, .34f + spread * .08f)
+
+            auraPaint.shader = RadialGradient(
+                0f,
+                0f,
+                radius,
+                intArrayOf(
+                    argb((46 * strength).toInt(), color),
+                    argb((24 * strength).toInt(), color),
+                    argb((8 * strength).toInt(), color),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, .30f, .65f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(0f, 0f, radius, auraPaint)
+            canvas.restore()
+        }
+
         auraPaint.shader = null
     }
 
@@ -177,23 +185,26 @@ class LyricOverlayView(context: Context) : View(context) {
         canvas: Canvas,
         cx: Float,
         cy: Float,
-        radius: Float,
         colors: IntArray,
-        strength: Float
+        strength: Float,
+        spread: Float
     ) {
         if (prefs.reduceMotion) return
         val time = SystemClock.uptimeMillis() / 1000f
-        for (i in 0 until 7) {
-            val angle = i * .92f + time * (.08f + i * .004f)
-            val r = radius * (.18f + (i % 4) * .075f)
+        val orbit = min(width * .17f, dp(78f)) * (.85f + spread * .2f)
+
+        for (i in 0 until 5) {
+            val angle = i * 1.26f + time * (.07f + i * .004f)
+            val r = orbit * (.52f + (i % 3) * .16f)
             val x = cx + cos(angle.toDouble()).toFloat() * r
-            val y = cy + sin((angle * .71f).toDouble()).toFloat() * r * .32f
+            val y = cy + sin((angle * .72f).toDouble()).toFloat() * r * .27f
             val c = colors[i % colors.size]
+
             particlePaint.color = Color.argb(
-                (18 + 23 * strength).toInt().coerceIn(0, 54),
+                (12 + 17 * strength).toInt().coerceIn(0, 36),
                 Color.red(c), Color.green(c), Color.blue(c)
             )
-            canvas.drawCircle(x, y, dp(.45f + (i % 2) * .22f), particlePaint)
+            canvas.drawCircle(x, y, dp(.38f + (i % 2) * .16f), particlePaint)
         }
     }
 
@@ -202,24 +213,36 @@ class LyricOverlayView(context: Context) : View(context) {
         val sub = when {
             title.isNotBlank() && artist.isNotBlank() -> artist
             title.isNotBlank() -> "Söz aranıyor…"
-            else -> "Müziğini aç — sözler burada ışığa dönüşsün"
+            else -> "Müziğini aç"
         }
 
         drawCentered(
-            canvas, headline, cy - dp(9f),
-            sp(22f * prefs.fontScale),
-            Color.WHITE, .96f, true, colors
+            canvas = canvas,
+            text = headline,
+            y = cy - dp(8f),
+            size = sp(21f * prefs.fontScale),
+            color = Color.rgb(251, 249, 255),
+            alpha = .96f,
+            bold = true,
+            glowColor = colors[1],
+            glow = dp(7f) * prefs.strength
         )
         drawCentered(
-            canvas, sub, cy + dp(24f),
-            sp(11.5f * prefs.fontScale),
-            Color.WHITE, if (prefs.highContrast) .68f else .42f, false, colors
+            canvas = canvas,
+            text = sub,
+            y = cy + dp(23f),
+            size = sp(11.5f * prefs.fontScale),
+            color = Color.WHITE,
+            alpha = if (prefs.highContrast) .66f else .40f,
+            bold = false,
+            glowColor = colors[1],
+            glow = 0f
         )
     }
 
     private fun drawLyrics(canvas: Canvas, colors: IntArray, cy: Float) {
         val elapsed = (SystemClock.uptimeMillis() - transitionStarted).coerceAtLeast(0L)
-        val transition = if (prefs.reduceMotion) 1f else min(1f, elapsed / 440f)
+        val transition = if (prefs.reduceMotion) 1f else min(1f, elapsed / 420f)
         val eased = 1f - (1f - transition) * (1f - transition)
 
         val current = lines.getOrNull(currentIndex)?.text ?: ""
@@ -228,43 +251,54 @@ class LyricOverlayView(context: Context) : View(context) {
 
         if (prev != null) {
             drawCentered(
-                canvas, prev, cy - dp(50f),
-                sp(15.5f * prefs.fontScale),
-                Color.WHITE,
-                if (prefs.highContrast) .48f else .34f,
-                false, colors
+                canvas = canvas,
+                text = prev,
+                y = cy - dp(54f),
+                size = sp(15.8f * prefs.fontScale),
+                color = Color.WHITE,
+                alpha = if (prefs.highContrast) .50f else .35f,
+                bold = false,
+                glowColor = colors[1],
+                glow = 0f
             )
         }
 
         if (previousIndex >= 0 && previousIndex != currentIndex && transition < 1f) {
             val old = lines.getOrNull(previousIndex)?.text
             if (!old.isNullOrBlank()) {
-                drawActiveLayout(
-                    canvas, old,
-                    cy - eased * dp(13f),
-                    colors,
-                    alpha = (1f - eased) * .50f,
+                drawActive(
+                    canvas = canvas,
+                    text = old,
+                    centerY = cy - eased * dp(13f),
+                    colors = colors,
+                    alpha = (1f - eased) * .42f,
                     progress = 1f,
-                    transitionBlur = dp(2.5f + eased * 2f)
+                    transitionBlur = dp(2.5f + eased * 2.8f)
                 )
             }
         }
 
-        val y = cy + (1f - eased) * dp(6f)
-        drawActiveLayout(
-            canvas, current, y, colors,
-            alpha = .46f + eased * .54f,
+        drawActive(
+            canvas = canvas,
+            text = current,
+            centerY = cy + (1f - eased) * dp(5f),
+            colors = colors,
+            alpha = .48f + eased * .52f,
             progress = lineProgress(),
-            transitionBlur = (1f - eased) * dp(2.4f)
+            transitionBlur = (1f - eased) * dp(2.2f)
         )
 
         if (next != null) {
             drawCentered(
-                canvas, next, cy + dp(52f),
-                sp(15f * prefs.fontScale),
-                Color.WHITE,
-                if (prefs.highContrast) .44f else .29f,
-                false, colors
+                canvas = canvas,
+                text = next,
+                y = cy + dp(55f),
+                size = sp(15.4f * prefs.fontScale),
+                color = Color.WHITE,
+                alpha = if (prefs.highContrast) .45f else .29f,
+                bold = false,
+                glowColor = colors[1],
+                glow = 0f
             )
         }
 
@@ -276,10 +310,12 @@ class LyricOverlayView(context: Context) : View(context) {
         val start = lines[currentIndex].timeMs
         val end = lines.getOrNull(currentIndex + 1)?.timeMs ?: (start + 4500L)
         if (end <= start) return 1f
-        return ((positionMs - start).toFloat() / (end - start).toFloat()).coerceIn(0f, 1f)
+
+        return ((positionMs - start).toFloat() / (end - start).toFloat())
+            .coerceIn(0f, 1f)
     }
 
-    private fun drawActiveLayout(
+    private fun drawActive(
         canvas: Canvas,
         text: String,
         centerY: Float,
@@ -288,64 +324,111 @@ class LyricOverlayView(context: Context) : View(context) {
         progress: Float,
         transitionBlur: Float
     ) {
-        val maxWidth = (width * .86f).toInt().coerceAtLeast(80)
-        var size = sp(30f * prefs.fontScale)
-        val minSize = sp(20f * prefs.fontScale)
+        // Generous invisible margins prevent glyph glow from ever touching
+        // the window edges and revealing the overlay rectangle.
+        val maxWidth = (width * .74f).toInt().coerceAtLeast(120)
+        var size = sp(32f * prefs.fontScale)
+        val minSize = sp(19.5f * prefs.fontScale)
 
-        var measurement = buildLayout(text, size, maxWidth, Color.WHITE, 1f, null, 0f, colors[1], false)
+        var measurement = makeLayout(
+            text, size, maxWidth, Color.WHITE, 1f,
+            null, 0f, colors[1], false
+        )
+
         while (measurement.lineCount > 2 && size > minSize) {
-            size -= sp(1.15f)
-            measurement = buildLayout(text, size, maxWidth, Color.WHITE, 1f, null, 0f, colors[1], false)
+            size -= sp(1.0f)
+            measurement = makeLayout(
+                text, size, maxWidth, Color.WHITE, 1f,
+                null, 0f, colors[1], false
+            )
         }
 
         val left = (width - maxWidth) / 2f
         val top = centerY - measurement.height / 2f
 
-        // 1) Colored luminous silhouette. The letters themselves stay mostly white.
-        val glowGradient = LinearGradient(
-            0f, 0f, maxWidth.toFloat(), 0f,
-            colors, floatArrayOf(0f, .50f, 1f), Shader.TileMode.CLAMP
+        val colorFlow = LinearGradient(
+            0f,
+            0f,
+            maxWidth.toFloat(),
+            0f,
+            colors,
+            floatArrayOf(0f, .50f, 1f),
+            Shader.TileMode.CLAMP
         )
-        val glow = buildLayout(
-            text, size, maxWidth, Color.WHITE,
-            .58f * alpha, glowGradient,
-            dp(4.5f) + transitionBlur,
-            colors[1], true
+
+        // Distant bloom: wide, low-alpha, follows glyphs.
+        val bloom = makeLayout(
+            text,
+            size,
+            maxWidth,
+            Color.WHITE,
+            .30f * alpha,
+            colorFlow,
+            dp(15f) + transitionBlur,
+            colors[1],
+            true
         )
         canvas.save()
         canvas.translate(left, top)
-        glow.draw(canvas)
+        bloom.draw(canvas)
         canvas.restore()
 
-        // 2) Stable near-white core = readable on both dark and colorful apps.
-        val core = buildLayout(
-            text, size, maxWidth,
-            if (prefs.highContrast) Color.WHITE else Color.rgb(249, 246, 255),
-            .96f * alpha, null,
-            transitionBlur * .35f,
-            colors[1], false
+        // Mid glow: brighter but still only around letters.
+        val midGlow = makeLayout(
+            text,
+            size,
+            maxWidth,
+            Color.WHITE,
+            .45f * alpha,
+            colorFlow,
+            dp(7f) + transitionBlur * .55f,
+            colors[1],
+            true
+        )
+        canvas.save()
+        canvas.translate(left, top)
+        midGlow.draw(canvas)
+        canvas.restore()
+
+        // Main core: almost white, so it looks like illuminated typography
+        // instead of a fully neon-colored font.
+        val core = makeLayout(
+            text,
+            size,
+            maxWidth,
+            if (prefs.highContrast) Color.WHITE else Color.rgb(252, 249, 255),
+            .98f * alpha,
+            null,
+            transitionBlur * .22f,
+            colors[1],
+            false
         )
         canvas.save()
         canvas.translate(left, top)
         core.draw(canvas)
         canvas.restore()
 
-        // 3) Karaoke tint passes through the white core instead of painting the whole line neon.
-        val tint = buildLayout(
-            text, size, maxWidth, Color.WHITE,
-            .30f * alpha, glowGradient,
-            dp(1.8f),
-            colors[1], true
+        // Karaoke shimmer: a restrained colored pass through the white core.
+        val shimmer = makeLayout(
+            text,
+            size,
+            maxWidth,
+            Color.WHITE,
+            .23f * alpha,
+            colorFlow,
+            dp(2.2f),
+            colors[1],
+            true
         )
         canvas.save()
         canvas.translate(left, top)
-        val clipWidth = maxWidth * max(.06f, progress)
-        canvas.clipRect(0f, 0f, clipWidth, tint.height.toFloat())
-        tint.draw(canvas)
+        val clipWidth = maxWidth * max(.04f, progress)
+        canvas.clipRect(0f, -dp(22f), clipWidth, shimmer.height + dp(44f))
+        shimmer.draw(canvas)
         canvas.restore()
     }
 
-    private fun buildLayout(
+    private fun makeLayout(
         text: String,
         size: Float,
         maxWidth: Int,
@@ -364,22 +447,21 @@ class LyricOverlayView(context: Context) : View(context) {
         textPaint.isFakeBoldText = true
         textPaint.shader = shader
 
-        if (luminous && glowRadius > .2f) {
+        if (glowRadius > .2f) {
+            val shadowAlpha = if (luminous) {
+                (148 * alpha).toInt().coerceIn(0, 170)
+            } else {
+                (58 * alpha).toInt().coerceIn(0, 76)
+            }
             textPaint.setShadowLayer(
                 glowRadius,
-                0f, 0f,
+                0f,
+                0f,
                 Color.argb(
-                    (160 * alpha).toInt().coerceIn(0, 180),
-                    Color.red(glowColor), Color.green(glowColor), Color.blue(glowColor)
-                )
-            )
-        } else if (!luminous && glowRadius > .2f) {
-            textPaint.setShadowLayer(
-                glowRadius,
-                0f, 0f,
-                Color.argb(
-                    (72 * alpha).toInt().coerceIn(0, 90),
-                    Color.red(glowColor), Color.green(glowColor), Color.blue(glowColor)
+                    shadowAlpha,
+                    Color.red(glowColor),
+                    Color.green(glowColor),
+                    Color.blue(glowColor)
                 )
             )
         } else {
@@ -402,7 +484,8 @@ class LyricOverlayView(context: Context) : View(context) {
         color: Int,
         alpha: Float,
         bold: Boolean,
-        colors: IntArray
+        glowColor: Int,
+        glow: Float
     ) {
         dimPaint.reset()
         dimPaint.isAntiAlias = true
@@ -410,15 +493,24 @@ class LyricOverlayView(context: Context) : View(context) {
         dimPaint.color = color
         dimPaint.alpha = (255 * alpha).toInt().coerceIn(0, 255)
         dimPaint.isFakeBoldText = bold
-        if (bold) {
+
+        if (glow > .2f) {
             dimPaint.setShadowLayer(
-                dp(4f + 4f * prefs.strength),
-                0f, 0f,
-                Color.argb(92, Color.red(colors[1]), Color.green(colors[1]), Color.blue(colors[1]))
+                glow,
+                0f,
+                0f,
+                Color.argb(
+                    (90 * alpha).toInt().coerceIn(0, 110),
+                    Color.red(glowColor),
+                    Color.green(glowColor),
+                    Color.blue(glowColor)
+                )
             )
+        } else {
+            dimPaint.clearShadowLayer()
         }
 
-        val maxWidth = (width * .88f).toInt().coerceAtLeast(80)
+        val maxWidth = (width * .78f).toInt().coerceAtLeast(120)
         val layout = StaticLayout.Builder.obtain(text, 0, text.length, dimPaint, maxWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
@@ -429,31 +521,5 @@ class LyricOverlayView(context: Context) : View(context) {
         canvas.translate((width - maxWidth) / 2f, y - layout.height / 2f)
         layout.draw(canvas)
         canvas.restore()
-    }
-
-    private fun drawEditCorners(canvas: Canvas, accent: Int) {
-        editPaint.style = Paint.Style.STROKE
-        editPaint.strokeCap = Paint.Cap.ROUND
-        editPaint.strokeWidth = dp(1.25f)
-        editPaint.color = Color.argb(150, Color.red(accent), Color.green(accent), Color.blue(accent))
-
-        val p = dp(9f)
-        val l = dp(13f)
-        // top-left
-        canvas.drawLine(p, p, p + l, p, editPaint)
-        canvas.drawLine(p, p, p, p + l, editPaint)
-        // top-right
-        canvas.drawLine(width - p - l, p, width - p, p, editPaint)
-        canvas.drawLine(width - p, p, width - p, p + l, editPaint)
-        // bottom-left
-        canvas.drawLine(p, height - p, p + l, height - p, editPaint)
-        canvas.drawLine(p, height - p - l, p, height - p, editPaint)
-        // bottom-right
-        canvas.drawLine(width - p - l, height - p, width - p, height - p, editPaint)
-        canvas.drawLine(width - p, height - p - l, width - p, height - p, editPaint)
-
-        editPaint.style = Paint.Style.FILL
-        editPaint.color = Color.argb(185, 255, 255, 255)
-        canvas.drawCircle(width - p, height - p, dp(1.4f), editPaint)
     }
 }

@@ -1,6 +1,7 @@
 package com.example.lyricstream
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -37,6 +38,8 @@ class LyricOverlayView(context: Context) : View(context) {
     private val scaledDensity get() = resources.displayMetrics.scaledDensity
     private fun dp(v: Float) = v * density
     private fun sp(v: Float) = v * scaledDensity
+    private val landscape: Boolean
+        get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
@@ -137,7 +140,11 @@ class LyricOverlayView(context: Context) : View(context) {
             Color.red(color), Color.green(color), Color.blue(color)
         )
 
-        val base = min(width * .22f, dp(96f)) * (.78f + spread * .38f)
+        val base = if (landscape) {
+            min(width * .145f, dp(84f)) * (.82f + spread * .32f)
+        } else {
+            min(width * .22f, dp(96f)) * (.82f + spread * .36f)
+        }
 
         // Three small feathered light clouds. None reaches the overlay bounds,
         // so there is no visible panel, edge, rectangle, or clipped light wall.
@@ -159,16 +166,16 @@ class LyricOverlayView(context: Context) : View(context) {
 
             canvas.save()
             canvas.translate(lx, ly)
-            canvas.scale(1f, .34f + spread * .08f)
+            canvas.scale(1f, if (landscape) .30f + spread * .06f else .34f + spread * .08f)
 
             auraPaint.shader = RadialGradient(
                 0f,
                 0f,
                 radius,
                 intArrayOf(
-                    argb((46 * strength).toInt(), color),
-                    argb((24 * strength).toInt(), color),
-                    argb((8 * strength).toInt(), color),
+                    argb((68 * strength).toInt(), color),
+                    argb((34 * strength).toInt(), color),
+                    argb((10 * strength).toInt(), color),
                     Color.TRANSPARENT,
                 ),
                 floatArrayOf(0f, .30f, .65f, 1f),
@@ -191,7 +198,10 @@ class LyricOverlayView(context: Context) : View(context) {
     ) {
         if (prefs.reduceMotion) return
         val time = SystemClock.uptimeMillis() / 1000f
-        val orbit = min(width * .17f, dp(78f)) * (.85f + spread * .2f)
+        val orbit = min(
+            width * if (landscape) .11f else .17f,
+            dp(if (landscape) 64f else 78f)
+        ) * (.85f + spread * .2f)
 
         for (i in 0 until 5) {
             val angle = i * 1.26f + time * (.07f + i * .004f)
@@ -220,7 +230,7 @@ class LyricOverlayView(context: Context) : View(context) {
             canvas = canvas,
             text = headline,
             y = cy - dp(8f),
-            size = sp(21f * prefs.fontScale),
+            size = sp((if (landscape) 17.5f else 21f) * prefs.fontScale),
             color = Color.rgb(251, 249, 255),
             alpha = .96f,
             bold = true,
@@ -230,8 +240,8 @@ class LyricOverlayView(context: Context) : View(context) {
         drawCentered(
             canvas = canvas,
             text = sub,
-            y = cy + dp(23f),
-            size = sp(11.5f * prefs.fontScale),
+            y = cy + dp(if (landscape) 18f else 23f),
+            size = sp((if (landscape) 10.5f else 11.5f) * prefs.fontScale),
             color = Color.WHITE,
             alpha = if (prefs.highContrast) .66f else .40f,
             bold = false,
@@ -253,8 +263,8 @@ class LyricOverlayView(context: Context) : View(context) {
             drawCentered(
                 canvas = canvas,
                 text = prev,
-                y = cy - dp(54f),
-                size = sp(15.8f * prefs.fontScale),
+                y = cy - dp(if (landscape) 37f else 54f),
+                size = sp((if (landscape) 12.4f else 15.8f) * prefs.fontScale),
                 color = Color.WHITE,
                 alpha = if (prefs.highContrast) .50f else .35f,
                 bold = false,
@@ -292,8 +302,8 @@ class LyricOverlayView(context: Context) : View(context) {
             drawCentered(
                 canvas = canvas,
                 text = next,
-                y = cy + dp(55f),
-                size = sp(15.4f * prefs.fontScale),
+                y = cy + dp(if (landscape) 38f else 55f),
+                size = sp((if (landscape) 12.2f else 15.4f) * prefs.fontScale),
                 color = Color.WHITE,
                 alpha = if (prefs.highContrast) .45f else .29f,
                 bold = false,
@@ -326,9 +336,11 @@ class LyricOverlayView(context: Context) : View(context) {
     ) {
         // Generous invisible margins prevent glyph glow from ever touching
         // the window edges and revealing the overlay rectangle.
-        val maxWidth = (width * .74f).toInt().coerceAtLeast(120)
-        var size = sp(32f * prefs.fontScale)
-        val minSize = sp(19.5f * prefs.fontScale)
+        val maxWidth = (
+            width * if (landscape) .62f else .74f
+        ).toInt().coerceAtLeast(120)
+        var size = sp((if (landscape) 24.5f else 30.5f) * prefs.fontScale)
+        val minSize = sp((if (landscape) 17.5f else 19.5f) * prefs.fontScale)
 
         var measurement = makeLayout(
             text, size, maxWidth, Color.WHITE, 1f,
@@ -362,9 +374,9 @@ class LyricOverlayView(context: Context) : View(context) {
             size,
             maxWidth,
             Color.WHITE,
-            .30f * alpha,
+            (if (landscape) .36f else .32f) * alpha,
             colorFlow,
-            dp(15f) + transitionBlur,
+            dp(if (landscape) 11f else 15f) + transitionBlur,
             colors[1],
             true
         )
@@ -379,15 +391,33 @@ class LyricOverlayView(context: Context) : View(context) {
             size,
             maxWidth,
             Color.WHITE,
-            .45f * alpha,
+            (if (landscape) .52f else .47f) * alpha,
             colorFlow,
-            dp(7f) + transitionBlur * .55f,
+            dp(if (landscape) 5.8f else 7f) + transitionBlur * .55f,
             colors[1],
             true
         )
         canvas.save()
         canvas.translate(left, top)
         midGlow.draw(canvas)
+        canvas.restore()
+
+        // Soft contrast shadow keeps white text readable on bright game UI
+        // without creating a stroke or visible container.
+        val contrast = makeLayout(
+            text,
+            size,
+            maxWidth,
+            Color.WHITE,
+            .16f * alpha,
+            null,
+            dp(if (landscape) 2.2f else 2.8f),
+            Color.BLACK,
+            false
+        )
+        canvas.save()
+        canvas.translate(left, top + dp(.6f))
+        contrast.draw(canvas)
         canvas.restore()
 
         // Main core: almost white, so it looks like illuminated typography
@@ -510,7 +540,9 @@ class LyricOverlayView(context: Context) : View(context) {
             dimPaint.clearShadowLayer()
         }
 
-        val maxWidth = (width * .78f).toInt().coerceAtLeast(120)
+        val maxWidth = (
+            width * if (landscape) .66f else .78f
+        ).toInt().coerceAtLeast(120)
         val layout = StaticLayout.Builder.obtain(text, 0, text.length, dimPaint, maxWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)

@@ -209,7 +209,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('LyricStream', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.4)),
-              Text('LUMINOUS 14', style: TextStyle(fontSize: 9, letterSpacing: 1.8, color: Color(0xFF8E92A6))),
+              Text('PURE AURA 15', style: TextStyle(fontSize: 9, letterSpacing: 1.8, color: Color(0xFF8E92A6))),
             ],
           ),
           const Spacer(),
@@ -271,12 +271,15 @@ class Dashboard extends StatelessWidget {
                     right: 14, top: 13,
                     child: Container(
                       width: 24, height: 24,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.black.withOpacity(.28),
-                        border: Border.all(color: Colors.white.withOpacity(.08)),
+                        color: Colors.transparent,
                       ),
-                      child: const Icon(Icons.fullscreen_rounded, size: 14),
+                      child: const Icon(
+                        Icons.fullscreen_rounded,
+                        size: 14,
+                        color: Color(0xFF8E92A6),
+                      ),
                     ),
                   ),
                 ],
@@ -565,27 +568,9 @@ class _StageSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF0B0D13).withOpacity(.82),
-                const Color(0xFF08090E).withOpacity(.72),
-              ],
-            ),
-            border: Border.all(color: Colors.white.withOpacity(.032)),
-          ),
-          child: child,
-        ),
-      ),
-    );
+    // Deliberately no fill, border, shadow or glass edge.
+    // The preview fades into the page exactly like the real overlay.
+    return RepaintBoundary(child: child);
   }
 }
 
@@ -775,28 +760,51 @@ class AmbientPainter extends CustomPainter {
 }
 
 class PreviewBackdropPainter extends CustomPainter {
-  final double phase; PreviewBackdropPainter(this.phase);
+  final double phase;
+  PreviewBackdropPainter(this.phase);
+
   @override
   void paint(Canvas c, Size s) {
-    c.drawRect(Offset.zero & s, Paint()..color = const Color(0xFF090B10));
-    final p = Paint();
-    for (var i = 0; i < 7; i++) {
-      final x = s.width * ((i * .173 + phase * .015) % 1);
-      final y = s.height * (.18 + (i % 4) * .21);
-      p.color = Colors.white.withOpacity(.006 + (i % 3) * .003);
-      c.drawCircle(Offset(x, y), 18 + i * 4, p);
-    }
-    p.shader = const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-      colors: [Color(0x221C2334), Color(0x00000000), Color(0x22130E1C)]).createShader(Offset.zero & s);
-    c.drawRect(Offset.zero & s, p);
+    final center = Offset(s.width * .5, s.height * .52);
+    final radius = s.width * .58;
+
+    final vignette = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xD90A0C12),
+          const Color(0x9A090B10),
+          const Color(0x43090B10),
+          const Color(0x00090B10),
+        ],
+        stops: const [0, .40, .72, 1],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    c.drawCircle(center, radius, vignette);
+
+    final drift = Offset(
+      s.width * (.50 + .025 * math.sin(phase * math.pi * 2)),
+      s.height * .52,
+    );
+    final haze = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0x182C1A44),
+          const Color(0x0D133743),
+          Colors.transparent,
+        ],
+        stops: const [0, .48, 1],
+      ).createShader(Rect.fromCircle(center: drift, radius: s.width * .38));
+    c.drawCircle(drift, s.width * .38, haze);
   }
-  @override bool shouldRepaint(covariant PreviewBackdropPainter old) => true;
+
+  @override
+  bool shouldRepaint(covariant PreviewBackdropPainter old) => true;
 }
 
 class LyricPreviewPainter extends CustomPainter {
   final double phase, strength, spread, fontScale;
   final AuraTheme theme;
   final bool highContrast;
+
   LyricPreviewPainter({
     required this.phase,
     required this.strength,
@@ -807,131 +815,204 @@ class LyricPreviewPainter extends CustomPainter {
   });
 
   List<Color> get colors => switch (theme) {
-    AuraTheme.aurora => const [Color(0xFF55E6FF), Color(0xFFC76AFF), Color(0xFFFF65A5)],
-    AuraTheme.prism => const [Color(0xFF69A7FF), Color(0xFFE96EFF), Color(0xFFFFC861)],
-    AuraTheme.ember => const [Color(0xFFFFA64E), Color(0xFFFF526A), Color(0xFFD13EFF)],
-    AuraTheme.mint => const [Color(0xFF5DFFD0), Color(0xFF5DC7FF), Color(0xFFA578FF)],
-    AuraTheme.mono => const [Color(0xFFFFFFFF), Color(0xFFDDE2F0), Color(0xFF8C95AA)],
+    AuraTheme.aurora => const [
+        Color(0xFF57E6FF),
+        Color(0xFFC86BFF),
+        Color(0xFFFF67A9),
+      ],
+    AuraTheme.prism => const [
+        Color(0xFF68ABFF),
+        Color(0xFFE86FFF),
+        Color(0xFFFFC65F),
+      ],
+    AuraTheme.ember => const [
+        Color(0xFFFFAB52),
+        Color(0xFFFF546F),
+        Color(0xFFD244FF),
+      ],
+    AuraTheme.mint => const [
+        Color(0xFF5BFFD3),
+        Color(0xFF5CC9FF),
+        Color(0xFFA37AFF),
+      ],
+    AuraTheme.mono => const [
+        Color(0xFFFFFFFF),
+        Color(0xFFDEE3EF),
+        Color(0xFF969DB0),
+      ],
   };
 
   @override
   void paint(Canvas c, Size s) {
-    final center = Offset(s.width * .52, s.height * .52);
-    final radius = s.width * (.26 + spread * .28);
+    final center = Offset(s.width * .5, s.height * .52);
+    final localRadius = s.width * (.115 + spread * .055);
 
-    c.save();
-    c.translate(center.dx, center.dy);
-    c.scale(1, .52);
-    final aura = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          colors[1].withOpacity(.31 * strength),
-          colors[2].withOpacity(.17 * strength),
-          colors[0].withOpacity(.08 * strength),
-          Colors.transparent,
-        ],
-        stops: const [0, .30, .64, 1],
-      ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius));
-    c.drawCircle(Offset.zero, radius, aura);
-    c.restore();
+    final lobeCenters = [
+      Offset(center.dx - localRadius * .70, center.dy + 1),
+      Offset(center.dx, center.dy - 2),
+      Offset(center.dx + localRadius * .70, center.dy + 2),
+    ];
 
-    final orb = Offset(s.width * .105, s.height * .52);
+    for (var i = 0; i < lobeCenters.length; i++) {
+      c.save();
+      c.translate(lobeCenters[i].dx, lobeCenters[i].dy);
+      c.scale(1, .38);
+      final p = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            colors[i].withOpacity(.23 * strength),
+            colors[i].withOpacity(.10 * strength),
+            colors[i].withOpacity(.025 * strength),
+            Colors.transparent,
+          ],
+          stops: const [0, .32, .66, 1],
+        ).createShader(
+          Rect.fromCircle(center: Offset.zero, radius: localRadius * 1.45),
+        );
+      c.drawCircle(Offset.zero, localRadius * 1.45, p);
+      c.restore();
+    }
+
+    final orb = Offset(s.width * .108, s.height * .52);
     c.drawCircle(
       orb,
-      3.0,
+      2.8,
       Paint()
         ..shader = RadialGradient(
-          colors: [Colors.white, colors[1], colors[1].withOpacity(0)],
-        ).createShader(Rect.fromCircle(center: orb, radius: 6)),
-    );
-    c.drawCircle(orb, 1.05, Paint()..color = Colors.white);
-
-    _text(
-      c, s, 'Böyle günler olur', s.height * .33,
-      14.5 * fontScale,
-      Colors.white.withOpacity(highContrast ? .50 : .34),
-      FontWeight.w500,
-    );
-
-    final activeSize = 30 * fontScale;
-    final maxWidth = s.width * .82;
-
-    final glow = TextPainter(
-      text: TextSpan(
-        text: 'Böyle günler olur',
-        style: TextStyle(
-          fontSize: activeSize,
-          fontWeight: FontWeight.w700,
-          foreground: Paint()
-            ..shader = LinearGradient(colors: colors)
-                .createShader(Rect.fromLTWH(0, 0, s.width, 48)),
-          shadows: [
-            Shadow(color: colors[1].withOpacity(.78 * strength), blurRadius: 26 * strength),
-            Shadow(color: colors[2].withOpacity(.34 * strength), blurRadius: 40 * strength),
+          colors: [
+            Colors.white,
+            colors[1],
+            colors[1].withOpacity(0),
           ],
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      maxLines: 2,
-      textAlign: TextAlign.center,
-    )..layout(maxWidth: maxWidth);
-    glow.paint(c, Offset((s.width - glow.width) / 2, s.height * .45));
+          stops: const [0, .20, 1],
+        ).createShader(Rect.fromCircle(center: orb, radius: 5.5)),
+    );
+    c.drawCircle(orb, .85, Paint()..color = Colors.white);
 
-    final core = TextPainter(
-      text: TextSpan(
-        text: 'Böyle günler olur',
-        style: TextStyle(
-          fontSize: activeSize,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFFFDF9FF),
-          shadows: [
-            Shadow(color: colors[1].withOpacity(.24 * strength), blurRadius: 10),
-          ],
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      maxLines: 2,
-      textAlign: TextAlign.center,
-    )..layout(maxWidth: maxWidth);
-    core.paint(c, Offset((s.width - core.width) / 2, s.height * .45));
+    _dimText(
+      c,
+      s,
+      'Böyle günler olur',
+      s.height * .32,
+      14.2 * fontScale,
+      Colors.white.withOpacity(highContrast ? .51 : .35),
+    );
 
-    _text(
-      c, s, 'Gecenin de geldi bana geri', s.height * .68,
+    _activeText(
+      c,
+      s,
+      'Böyle günler olur',
+      centerY: s.height * .52,
+      size: 30.5 * fontScale,
+    );
+
+    _dimText(
+      c,
+      s,
+      'Gecenin de geldi bana geri',
+      s.height * .69,
       14 * fontScale,
-      Colors.white.withOpacity(highContrast ? .48 : .29),
-      FontWeight.w500,
+      Colors.white.withOpacity(highContrast ? .47 : .29),
     );
 
     final dots = Paint();
-    for (var i = 0; i < 6; i++) {
-      final ang = i * .91 + phase * math.pi * 2;
-      final r = 34 + (i % 3) * 17;
-      final pos = center + Offset(math.cos(ang) * r, math.sin(ang * .73) * r * .34);
-      dots.color = colors[i % colors.length].withOpacity(
-        .08 + .06 * math.sin(phase * math.pi * 2 + i).abs(),
+    for (var i = 0; i < 5; i++) {
+      final a = i * 1.25 + phase * math.pi * 2;
+      final r = 30.0 + (i % 3) * 15;
+      final pos = center + Offset(
+        math.cos(a) * r,
+        math.sin(a * .72) * r * .28,
       );
-      c.drawCircle(pos, .9 + (i % 2) * .45, dots);
+      dots.color = colors[i % colors.length].withOpacity(
+        .05 + .045 * math.sin(phase * math.pi * 2 + i).abs(),
+      );
+      c.drawCircle(pos, .75 + (i % 2) * .35, dots);
     }
   }
 
-  void _text(
+  void _activeText(
     Canvas c,
     Size s,
-    String t,
-    double y,
-    double fs,
-    Color color,
-    FontWeight weight,
-  ) {
-    final tp = TextPainter(
+    String text, {
+    required double centerY,
+    required double size,
+  }) {
+    final maxWidth = s.width * .74;
+    final shaderRect = Rect.fromLTWH(0, 0, maxWidth, 56);
+    final gradient = LinearGradient(colors: colors);
+
+    final bloom = TextPainter(
       text: TextSpan(
-        text: t,
-        style: TextStyle(fontSize: fs, color: color, fontWeight: weight),
+        text: text,
+        style: TextStyle(
+          fontSize: size,
+          fontWeight: FontWeight.w700,
+          foreground: Paint()..shader = gradient.createShader(shaderRect),
+          shadows: [
+            Shadow(
+              color: colors[1].withOpacity(.62 * strength),
+              blurRadius: 28 * strength,
+            ),
+            Shadow(
+              color: colors[2].withOpacity(.22 * strength),
+              blurRadius: 42 * strength,
+            ),
+          ],
+        ),
       ),
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
       maxLines: 2,
-    )..layout(maxWidth: s.width * .84);
+    )..layout(maxWidth: maxWidth);
+
+    final top = centerY - bloom.height / 2;
+    bloom.paint(c, Offset((s.width - bloom.width) / 2, top));
+
+    final core = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          fontSize: size,
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFFFDF9FF),
+          shadows: [
+            Shadow(
+              color: colors[1].withOpacity(.18 * strength),
+              blurRadius: 9,
+            ),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+    )..layout(maxWidth: maxWidth);
+
+    core.paint(c, Offset((s.width - core.width) / 2, centerY - core.height / 2));
+  }
+
+  void _dimText(
+    Canvas c,
+    Size s,
+    String text,
+    double y,
+    double size,
+    Color color,
+  ) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          fontSize: size,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+    )..layout(maxWidth: s.width * .78);
+
     tp.paint(c, Offset((s.width - tp.width) / 2, y));
   }
 
